@@ -18,8 +18,13 @@
             min-height: 100vh;
             box-sizing: border-box;
         }
-        h2 { margin-bottom: 10px; font-size: 1.2rem; text-align: center; }
-        #status { font-size: 0.8rem; color: #888; margin-bottom: 20px; }
+
+        h2 {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -27,31 +32,75 @@
             width: 100%;
             max-width: 350px;
         }
+
         .circle {
             aspect-ratio: 1;
             background-color: #333333;
             border-radius: 50%;
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            transition: transform 0.1s ease;
+            transition: transform 0.1s ease, background-color 0.2s ease;
         }
-        .circle:active { transform: scale(0.95); }
+
+        .circle:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body>
 
     <h2>Tap Any Circle!</h2>
-    <div id="status">Connecting...</div>
     
-    <div class="grid" id="grid"></div>
+    <div class="grid" id="grid">
+        <!-- 8 Circles Generated Dynamically -->
+    </div>
 
-    <script>
-        const BIN_ID = '65f141bcdc74654018b1a234'; // Public test bin or create your own on jsonbin.io
-        const API_KEY = '$2a$10$W...'; // Use a free jsonbin or swap logic
-        
-        // Simpler approach for absolute beginners directly on phone:
-        // Let's use a public Websocket echo / shared room via poch.ta or similar, 
-        // OR standard Firebase. Let's provide a working Firebase setup template instructions:
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://tapgame-28bc3-default-rtdb.firebaseio.com/";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Free public test configuration
+        const firebaseConfig = {
+            databaseURL: "https://html-multiplayer-default-rtdb.firebaseio.com/"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const circlesRef = ref(db, 'circles');
+
+        const grid = document.getElementById('grid');
+        const totalCircles = 8;
+        const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0', '#FFA533', '#A533FF'];
+
+        // 1. Generate the 8 circles on the UI
+        const circleElements = [];
+        for (let i = 0; i < totalCircles; i++) {
+            const circle = document.createElement('div');
+            circle.classList.add('circle');
+            circle.dataset.index = i;
+            
+            // When touched/clicked, pick a random color and push to database
+            circle.addEventListener('click', () => {
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                set(ref(db, `circles/${i}`), randomColor);
+            });
+
+            grid.appendChild(circle);
+            circleElements.push(circle);
+        }
+
+        // 2. Listen for real-time updates from any player's device
+        onValue(circlesRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                data.forEach((color, index) => {
+                    if (color && circleElements[index]) {
+                        circleElements[index].style.backgroundColor = color;
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>
