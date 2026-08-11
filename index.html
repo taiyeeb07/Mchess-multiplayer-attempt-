@@ -270,7 +270,7 @@
 <body>
 
     <!-- Noticeable Version Sidebar Badge -->
-    <div class="version-badge">v1.0.9</div>
+    <div class="version-badge">v1.1.0</div>
 
     <!-- Login Container -->
     <div id="login-screen">
@@ -314,7 +314,7 @@
 
         <!-- Private Local Bar Section -->
         <div class="private-section">
-            <h2>Private Bar (Local Only)</h2>
+            <h2>Private Bar (Server Saved)</h2>
             <div class="private-grid" id="privateGrid"></div>
         </div>
     </div>
@@ -454,9 +454,11 @@
                 }
             });
 
-            // Private Local Bar Logic (4 Circles)
+            // Private Bar Logic (Saved on Server per player)
             const privateGrid = document.getElementById('privateGrid');
             const totalPrivateCircles = 4;
+            const privateCirclesRef = ref(db, `privateBars/${playerName}`);
+            const privateCircleElements = [];
             
             for (let i = 0; i < totalPrivateCircles; i++) {
                 const pCircle = document.createElement('div');
@@ -464,10 +466,11 @@
                 
                 pCircle.addEventListener('click', () => {
                     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                    // Change color locally only
-                    pCircle.style.backgroundColor = randomColor;
+                    
+                    // Save color selection directly to Firebase database under this user's private path
+                    set(ref(db, `privateBars/${playerName}/${i}`), randomColor);
 
-                    // Broadcast alert fact that they changed a secret circle (without revealing the actual local layout)
+                    // Broadcast alert that they changed a secret circle
                     set(secretActionRef, {
                         player: playerName,
                         timestamp: Date.now()
@@ -475,7 +478,20 @@
                 });
 
                 privateGrid.appendChild(pCircle);
+                privateCircleElements.push(pCircle);
             }
+
+            // Sync private bar state from server database so it persists even if user leaves or logs back in later
+            onValue(privateCirclesRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    data.forEach((color, index) => {
+                        if (color && privateCircleElements[index]) {
+                            privateCircleElements[index].style.backgroundColor = color;
+                        }
+                    });
+                }
+            });
 
             // Listen for secret updates to show vanishing notification
             let secretTimeout;
