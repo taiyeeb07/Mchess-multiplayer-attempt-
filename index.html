@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Tap Game - Players</title>
+    <title>Multiplayer Tap Game</title>
     <style>
         body {
             margin: 0;
@@ -87,6 +87,31 @@
             max-width: 350px;
         }
 
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        #player-welcome {
+            font-size: 1rem;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        #logout-btn {
+            background: #ff5252;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
         /* Expanding Player List Dropdown */
         .player-dropdown {
             width: 100%;
@@ -117,7 +142,7 @@
         }
 
         .player-dropdown.open .dropdown-content {
-            max-height: 150px;
+            max-height: 200px;
         }
 
         .player-item {
@@ -138,14 +163,6 @@
             background: #2a2a2a;
             padding: 4px 8px;
             border-radius: 50%;
-        }
-
-        #player-welcome {
-            font-size: 1rem;
-            color: #4CAF50;
-            margin-bottom: 15px;
-            font-weight: bold;
-            text-align: center;
         }
 
         h2 {
@@ -181,8 +198,8 @@
     <div id="login-screen">
         <h2>Player Login</h2>
         <div class="input-group">
-            <label>Username (Sam / Manuel)</label>
-            <input type="text" id="usernameInput" placeholder="Enter name">
+            <label>Username</label>
+            <input type="text" id="usernameInput" placeholder="Sam, Manuel, Martha, Arthur">
         </div>
         <div class="input-group">
             <label>Password</label>
@@ -194,17 +211,18 @@
 
     <!-- Game Container -->
     <div id="game-screen">
-        <div id="player-welcome"></div>
+        <div class="top-bar">
+            <div id="player-welcome"></div>
+            <button id="logout-btn">Log Out</button>
+        </div>
 
         <!-- Expanding List Component -->
         <div class="player-dropdown" id="playerDropdown">
             <div class="dropdown-header" id="dropdownToggle">
               <span>👤 Connected Players</span>
-              <span id="playerCount">v (+0)</span>
+              <span id="playerCount">(+0)</span>
             </div>
-            <div class="dropdown-content" id="playerListContainer">
-                <!-- Dynamic Players List -->
-            </div>
+            <div class="dropdown-content" id="playerListContainer"></div>
         </div>
 
         <h2>Tap Any Circle!</h2>
@@ -230,19 +248,27 @@
         const loginBtn = document.getElementById('login-btn');
         const errorMsg = document.getElementById('error-msg');
         const playerWelcome = document.getElementById('player-welcome');
+        const logoutBtn = document.getElementById('logout-btn');
         
         const dropdownToggle = document.getElementById('dropdownToggle');
         const playerDropdown = document.getElementById('playerDropdown');
         const playerCount = document.getElementById('playerCount');
         const playerListContainer = document.getElementById('playerListContainer');
 
-        // Custom Profile Pictures mapping
+        // All profiles with custom PFPs
         const userProfiles = {
             "Sam": { pass: "X", pfp: "🐱" },
-            "Manuel": { pass: "Y", pfp: "🐶" }
+            "Manuel": { pass: "Y", pfp: "🐶" },
+            "Martha": { pass: "Z", pfp: "🦊" },
+            "Arthur": { pass: "A", pfp: "🦁" }
         };
 
-        // Toggle dropdown open/close
+        // Check if user is already saved in browser cache (localStorage)
+        const savedUser = localStorage.getItem('tapGameUser');
+        if (savedUser && userProfiles[savedUser]) {
+            startApp(savedUser);
+        }
+
         dropdownToggle.addEventListener('click', () => {
             playerDropdown.classList.toggle('open');
         });
@@ -252,25 +278,32 @@
             const enteredPass = passwordInput.value.trim();
 
             if (userProfiles[enteredUser] && userProfiles[enteredUser].pass === enteredPass) {
-                loginScreen.style.display = 'none';
-                gameScreen.style.display = 'flex';
-                playerWelcome.textContent = `Welcome, ${enteredUser}!`;
-
-                initGameSession(enteredUser);
+                // Save to local cache so they don't have to login again
+                localStorage.setItem('tapGameUser', enteredUser);
+                startApp(enteredUser);
             } else {
                 errorMsg.textContent = "Invalid username or password!";
             }
         });
 
-        function initGameSession(playerName) {
+        // Logout button logic
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('tapGameUser');
+            window.location.reload();
+        });
+
+        function startApp(playerName) {
+            loginScreen.style.display = 'none';
+            gameScreen.style.display = 'flex';
+            playerWelcome.textContent = `Hi, ${playerName}!`;
+
             const connectionsRef = ref(db, 'connections');
             const myConnectionRef = push(connectionsRef);
 
-            // Register user name in database
             set(myConnectionRef, { name: playerName });
             onDisconnect(myConnectionRef).remove();
 
-            // Track active users and build the expanding list
+            // Track active users
             onValue(connectionsRef, (snapshot) => {
                 const data = snapshot.val();
                 playerListContainer.innerHTML = '';
@@ -292,7 +325,7 @@
                 }
             });
 
-            // Initialize 8 Circles Grid Logic
+            // Circle Grid Logic
             const circlesRef = ref(db, 'circles');
             const grid = document.getElementById('grid');
             const totalCircles = 8;
