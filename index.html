@@ -19,8 +19,41 @@
             box-sizing: border-box;
         }
 
+        .status-bar {
+            display: flex;
+            align-items: center;
+            background: #1e1e1e;
+            padding: 10px 20px;
+            border-radius: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            gap: 10px;
+        }
+
+        .user-icon {
+            font-size: 1.2rem;
+            filter: grayscale(100%);
+            transition: filter 0.3s ease;
+        }
+
+        .user-icon.active {
+            filter: grayscale(0%);
+        }
+
+        #status-text {
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        #device-info {
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
         h2 {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             font-size: 1.2rem;
             text-align: center;
         }
@@ -49,35 +82,87 @@
 </head>
 <body>
 
+    <!-- Connection & Count Tracker UI -->
+    <div class="status-bar">
+        <span class="user-icon" id="userIcon">👤</span>
+        <span id="status-text">Connecting...</span>
+    </div>
+    <div id="device-info">Detecting device & network...</div>
+
     <h2>Tap Any Circle!</h2>
     
     <div class="grid" id="grid"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, onValue, push, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // Public demo configuration for instant testing
+        // Your Firebase Configuration
         const firebaseConfig = {
+            projectId: "tapgame-28bc3",
             databaseURL: "https://tapgame-28bc3-default-rtdb.firebaseio.com/"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const circlesRef = ref(db, 'circles');
 
+        // --- 1. Presence & Device Info Logic ---
+        const userIcon = document.getElementById('userIcon');
+        const statusText = document.getElementById('status-text');
+        const deviceInfoEl = document.getElementById('device-info');
+
+        // Simple device model detection from browser user agent
+        const ua = navigator.userAgent;
+        let deviceName = "Mobile Device";
+        if (/android/i.test(ua)) deviceName = "Android Device";
+        else if (/iphone|ipad|ipod/i.test(ua)) deviceName = "iOS Device";
+
+        // Fetch public IP using a free fast API
+        fetch('https://api.ipify.org?format=json')
+            .then(res => res.json())
+            .then(data => {
+                const userIp = data.ip;
+                deviceInfoEl.textContent = `${deviceName} (${userIp})`;
+                registerPresence(userIp, deviceName);
+            })
+            .catch(() => {
+                deviceInfoEl.textContent = `${deviceName} (IP Hidden)`;
+                registerPresence("Unknown IP", deviceName);
+            });
+
+        function registerPresence(ip, device) {
+            const connectionsRef = ref(db, 'connections');
+            const myConnectionRef = push(connectionsRef);
+
+            // Add user info to database and automatically remove it if they close the page
+            set(myConnectionRef, { ip: ip, device: device });
+            onDisconnect(myConnectionRef).remove();
+
+            // Listen to total active players online
+            onValue(connectionsRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const count = Object.keys(data).length;
+                    userIcon.classList.add('active');
+                    statusText.textContent = `Connected (+${count})`;
+                } else {
+                    userIcon.classList.remove('active');
+                    statusText.textContent = `Connected (+1)`;
+                }
+            });
+        }
+
+        // --- 2. Game Board Logic ---
+        const circlesRef = ref(db, 'circles');
         const grid = document.getElementById('grid');
         const totalCircles = 8;
         const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0', '#FFA533', '#A533FF'];
-
         const circleElements = [];
         
-        // 1. Generate the 8 circles dynamically
         for (let i = 0; i < totalCircles; i++) {
             const circle = document.createElement('div');
             circle.classList.add('circle');
             
-            // When clicked, pick a random color and save it to Firebase
             circle.addEventListener('click', () => {
                 const randomColor = colors[Math.floor(Math.random() * colors.length)];
                 set(ref(db, `circles/${i}`), randomColor);
@@ -87,7 +172,6 @@
             circleElements.push(circle);
         }
 
-        // 2. Listen for color updates from any device in real-time
         onValue(circlesRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
