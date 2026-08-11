@@ -17,6 +17,23 @@
             justify-content: center;
             min-height: 100vh;
             box-sizing: border-box;
+            position: relative;
+        }
+
+        /* Version Sidebar Badge */
+        .version-badge {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: #ff9800;
+            color: #121212;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            letter-spacing: 0.5px;
+            z-index: 1000;
         }
 
         /* Login Screen Styles */
@@ -172,7 +189,7 @@
             font-size: 0.8rem;
             padding: 8px 15px;
             border-radius: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             width: 100%;
             text-align: center;
             box-sizing: border-box;
@@ -183,17 +200,28 @@
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
         }
 
-        h2 {
+        /* Secret Action Notification Label */
+        #secret-log {
+            color: #ffeb3b;
+            font-size: 0.8rem;
             margin-bottom: 15px;
-            font-size: 1.2rem;
+            min-height: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        h2 {
+            margin-bottom: 10px;
+            font-size: 1.1rem;
             text-align: center;
         }
 
         .grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
+            gap: 15px;
             width: 100%;
+            margin-bottom: 20px;
         }
 
         .circle {
@@ -208,9 +236,41 @@
         .circle:active {
             transform: scale(0.95);
         }
+
+        /* Private Bar Section */
+        .private-section {
+            width: 100%;
+            background: #181818;
+            padding: 15px;
+            border-radius: 15px;
+            box-sizing: border-box;
+            border: 1px dashed #444;
+        }
+
+        .private-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            width: 100%;
+        }
+
+        .private-circle {
+            aspect-ratio: 1;
+            background-color: #444;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .private-circle:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body>
+
+    <!-- Noticeable Version Sidebar Badge -->
+    <div class="version-badge">v1.0.9</div>
 
     <!-- Login Container -->
     <div id="login-screen">
@@ -246,8 +306,17 @@
         <!-- Activity Log Box -->
         <div id="activity-log">Waiting for actions...</div>
 
-        <h2>Tap Any Circle!</h2>
+        <!-- Secret Action Label -->
+        <div id="secret-log"></div>
+
+        <h2>Shared Circles</h2>
         <div class="grid" id="grid"></div>
+
+        <!-- Private Local Bar Section -->
+        <div class="private-section">
+            <h2>Private Bar (Local Only)</h2>
+            <div class="private-grid" id="privateGrid"></div>
+        </div>
     </div>
 
     <script type="module">
@@ -276,6 +345,7 @@
         const playerCount = document.getElementById('playerCount');
         const playerListContainer = document.getElementById('playerListContainer');
         const activityLog = document.getElementById('activity-log');
+        const secretLog = document.getElementById('secret-log');
 
         const userProfiles = {
             "Sam": { pass: "X", pfp: "🐱" },
@@ -342,9 +412,11 @@
                 }
             });
 
-            // Circle Grid & Activity Log Sync Logic
+            // Shared Circles & Activity Log Logic
             const circlesRef = ref(db, 'circles');
             const lastActionRef = ref(db, 'lastAction');
+            const secretActionRef = ref(db, 'secretAction');
+            
             const grid = document.getElementById('grid');
             const totalCircles = 8;
             const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0', '#FFA533', '#A533FF'];
@@ -356,22 +428,14 @@
                 
                 circle.addEventListener('click', () => {
                     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                    
-                    // Update circle state
                     set(ref(db, `circles/${i}`), randomColor);
-
-                    // Broadcast who made the change and what hex color was picked
-                    set(lastActionRef, {
-                        player: playerName,
-                        color: randomColor
-                    });
+                    set(lastActionRef, { player: playerName, color: randomColor });
                 });
 
                 grid.appendChild(circle);
                 circleElements.push(circle);
             }
 
-            // Listen for color changes on circles
             onValue(circlesRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
@@ -383,11 +447,47 @@
                 }
             });
 
-            // Listen for the latest action ticker updates
             onValue(lastActionRef, (snapshot) => {
                 const action = snapshot.val();
                 if (action) {
                     activityLog.textContent = `${action.player} changed color to ${action.color}`;
+                }
+            });
+
+            // Private Local Bar Logic (4 Circles)
+            const privateGrid = document.getElementById('privateGrid');
+            const totalPrivateCircles = 4;
+            
+            for (let i = 0; i < totalPrivateCircles; i++) {
+                const pCircle = document.createElement('div');
+                pCircle.classList.add('private-circle');
+                
+                pCircle.addEventListener('click', () => {
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                    // Change color locally only
+                    pCircle.style.backgroundColor = randomColor;
+
+                    // Broadcast alert fact that they changed a secret circle (without revealing the actual local layout)
+                    set(secretActionRef, {
+                        player: playerName,
+                        timestamp: Date.now()
+                    });
+                });
+
+                privateGrid.appendChild(pCircle);
+            }
+
+            // Listen for secret updates to show vanishing notification
+            let secretTimeout;
+            onValue(secretActionRef, (snapshot) => {
+                const action = snapshot.val();
+                if (action) {
+                    secretLog.textContent = `${action.player} has changed color to a secret colour`;
+                    
+                    clearTimeout(secretTimeout);
+                    secretTimeout = setTimeout(() => {
+                        secretLog.textContent = '';
+                    }, 3000);
                 }
             });
         }
