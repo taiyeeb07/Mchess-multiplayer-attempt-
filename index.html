@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Tap Game - Login</title>
+    <title>Multiplayer Tap Game - Players</title>
     <style>
         body {
             margin: 0;
@@ -78,38 +78,66 @@
             min-height: 15px;
         }
 
-        /* Game Screen Styles (Hidden initially) */
+        /* Game Screen Styles */
         #game-screen {
             display: none;
             flex-direction: column;
             align-items: center;
             width: 100%;
+            max-width: 350px;
         }
 
-        .status-bar {
+        /* Expanding Player List Dropdown */
+        .player-dropdown {
+            width: 100%;
+            background: #1e1e1e;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-header {
+            padding: 12px 20px;
             display: flex;
             align-items: center;
-            background: #1e1e1e;
-            padding: 10px 20px;
-            border-radius: 30px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-            gap: 10px;
-        }
-
-        .user-icon {
-            font-size: 1.2rem;
-            filter: grayscale(100%);
-            transition: filter 0.3s ease;
-        }
-
-        .user-icon.active {
-            filter: grayscale(0%);
-        }
-
-        #status-text {
-            font-size: 0.9rem;
+            justify-content: space-between;
+            cursor: pointer;
             font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .dropdown-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #161616;
+            border-top: 1px solid #2a2a2a;
+        }
+
+        .player-dropdown.open .dropdown-content {
+            max-height: 150px;
+        }
+
+        .player-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            gap: 10px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #222;
+        }
+
+        .player-item:last-child {
+            border-bottom: none;
+        }
+
+        .pfp {
+            font-size: 1.2rem;
+            background: #2a2a2a;
+            padding: 4px 8px;
+            border-radius: 50%;
         }
 
         #player-welcome {
@@ -117,6 +145,13 @@
             color: #4CAF50;
             margin-bottom: 15px;
             font-weight: bold;
+            text-align: center;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            text-align: center;
         }
 
         .grid {
@@ -124,7 +159,6 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 20px;
             width: 100%;
-            max-width: 350px;
         }
 
         .circle {
@@ -158,12 +192,19 @@
         <div id="error-msg"></div>
     </div>
 
-    <!-- Game Container (Hidden until login) -->
+    <!-- Game Container -->
     <div id="game-screen">
         <div id="player-welcome"></div>
-        <div class="status-bar">
-            <span class="user-icon" id="userIcon">👤</span>
-            <span id="status-text">Waiting for players...</span>
+
+        <!-- Expanding List Component -->
+        <div class="player-dropdown" id="playerDropdown">
+            <div class="dropdown-header" id="dropdownToggle">
+              <span>👤 Connected Players</span>
+              <span id="playerCount">v (+0)</span>
+            </div>
+            <div class="dropdown-content" id="playerListContainer">
+                <!-- Dynamic Players List -->
+            </div>
         </div>
 
         <h2>Tap Any Circle!</h2>
@@ -182,7 +223,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // Login Logic
         const loginScreen = document.getElementById('login-screen');
         const gameScreen = document.getElementById('game-screen');
         const usernameInput = document.getElementById('usernameInput');
@@ -191,21 +231,27 @@
         const errorMsg = document.getElementById('error-msg');
         const playerWelcome = document.getElementById('player-welcome');
         
-        const userIcon = document.getElementById('userIcon');
-        const statusText = document.getElementById('status-text');
+        const dropdownToggle = document.getElementById('dropdownToggle');
+        const playerDropdown = document.getElementById('playerDropdown');
+        const playerCount = document.getElementById('playerCount');
+        const playerListContainer = document.getElementById('playerListContainer');
 
-        // Valid credentials
-        const validUsers = {
-            "Sam": "X",
-            "Manuel": "Y"
+        // Custom Profile Pictures mapping
+        const userProfiles = {
+            "Sam": { pass: "X", pfp: "🐱" },
+            "Manuel": { pass: "Y", pfp: "🐶" }
         };
+
+        // Toggle dropdown open/close
+        dropdownToggle.addEventListener('click', () => {
+            playerDropdown.classList.toggle('open');
+        });
 
         loginBtn.addEventListener('click', () => {
             const enteredUser = usernameInput.value.trim();
             const enteredPass = passwordInput.value.trim();
 
-            if (validUsers[enteredUser] && validUsers[enteredUser] === enteredPass) {
-                // Successful Login
+            if (userProfiles[enteredUser] && userProfiles[enteredUser].pass === enteredPass) {
                 loginScreen.style.display = 'none';
                 gameScreen.style.display = 'flex';
                 playerWelcome.textContent = `Welcome, ${enteredUser}!`;
@@ -220,24 +266,33 @@
             const connectionsRef = ref(db, 'connections');
             const myConnectionRef = push(connectionsRef);
 
-            // Register this authenticated player
+            // Register user name in database
             set(myConnectionRef, { name: playerName });
             onDisconnect(myConnectionRef).remove();
 
-            // Track active players
+            // Track active users and build the expanding list
             onValue(connectionsRef, (snapshot) => {
                 const data = snapshot.val();
+                playerListContainer.innerHTML = '';
+                
                 if (data) {
-                    const count = Object.keys(data).length;
-                    userIcon.classList.add('active');
-                    statusText.textContent = `Connected (+${count})`;
+                    const activeUsers = Object.values(data);
+                    playerCount.textContent = `(+${activeUsers.length})`;
+                    
+                    activeUsers.forEach(user => {
+                        const pfpEmoji = userProfiles[user.name] ? userProfiles[user.name].pfp : "👤";
+                        
+                        const item = document.createElement('div');
+                        item.classList.add('player-item');
+                        item.innerHTML = `<span class="pfp">${pfpEmoji}</span> <span>${user.name}</span>`;
+                        playerListContainer.appendChild(item);
+                    });
                 } else {
-                    userIcon.classList.remove('active');
-                    statusText.textContent = `Connected (+1)`;
+                    playerCount.textContent = `(+0)`;
                 }
             });
 
-            // Initialize Game Board
+            // Initialize 8 Circles Grid Logic
             const circlesRef = ref(db, 'circles');
             const grid = document.getElementById('grid');
             const totalCircles = 8;
