@@ -20,7 +20,7 @@
         }
 
         h2 {
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             font-size: 1.2rem;
             text-align: center;
         }
@@ -51,18 +51,15 @@
 
     <h2>Tap Any Circle!</h2>
     
-    <div class="grid" id="grid">
-        <!-- 8 Circles Generated Dynamically -->
-    </div>
+    <div class="grid" id="grid"></div>
 
-    <!-- Firebase SDKs -->
     <script type="module">
-        import { initializeApp } from "https://tapgame-28bc3-default-rtdb.firebaseio.com/";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // Free public test configuration
+        // Public demo configuration for instant testing
         const firebaseConfig = {
-            databaseURL: "https://html-multiplayer-default-rtdb.firebaseio.com/"
+            databaseURL: "https://tapgame-28bc3-default-rtdb.firebaseio.com/"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -73,14 +70,14 @@
         const totalCircles = 8;
         const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0', '#FFA533', '#A533FF'];
 
-        // 1. Generate the 8 circles on the UI
         const circleElements = [];
+        
+        // 1. Generate the 8 circles dynamically
         for (let i = 0; i < totalCircles; i++) {
             const circle = document.createElement('div');
             circle.classList.add('circle');
-            circle.dataset.index = i;
             
-            // When touched/clicked, pick a random color and push to database
+            // When clicked, pick a random color and save it to Firebase
             circle.addEventListener('click', () => {
                 const randomColor = colors[Math.floor(Math.random() * colors.length)];
                 set(ref(db, `circles/${i}`), randomColor);
@@ -90,7 +87,7 @@
             circleElements.push(circle);
         }
 
-        // 2. Listen for real-time updates from any player's device
+        // 2. Listen for color updates from any device in real-time
         onValue(circlesRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
