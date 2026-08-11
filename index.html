@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Tap Game</title>
+    <title>Multiplayer Tap Game - Login</title>
     <style>
         body {
             margin: 0;
@@ -19,13 +19,80 @@
             box-sizing: border-box;
         }
 
+        /* Login Screen Styles */
+        #login-screen {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+        }
+
+        #login-screen h2 {
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #2a2a2a;
+            color: #fff;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        #login-btn {
+            width: 100%;
+            padding: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        #error-msg {
+            color: #ff5252;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            min-height: 15px;
+        }
+
+        /* Game Screen Styles (Hidden initially) */
+        #game-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
         .status-bar {
             display: flex;
             align-items: center;
             background: #1e1e1e;
             padding: 10px 20px;
             border-radius: 30px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.4);
             gap: 10px;
         }
@@ -45,17 +112,11 @@
             font-weight: bold;
         }
 
-        #device-info {
-            font-size: 0.75rem;
-            color: #888;
-            margin-bottom: 25px;
-            text-align: center;
-        }
-
-        h2 {
-            margin-bottom: 20px;
-            font-size: 1.2rem;
-            text-align: center;
+        #player-welcome {
+            font-size: 1rem;
+            color: #4CAF50;
+            margin-bottom: 15px;
+            font-weight: bold;
         }
 
         .grid {
@@ -82,22 +143,37 @@
 </head>
 <body>
 
-    <!-- Connection & Count Tracker UI -->
-    <div class="status-bar">
-        <span class="user-icon" id="userIcon">👤</span>
-        <span id="status-text">Connecting...</span>
+    <!-- Login Container -->
+    <div id="login-screen">
+        <h2>Player Login</h2>
+        <div class="input-group">
+            <label>Username (Sam / Manuel)</label>
+            <input type="text" id="usernameInput" placeholder="Enter name">
+        </div>
+        <div class="input-group">
+            <label>Password</label>
+            <input type="password" id="passwordInput" placeholder="Enter password">
+        </div>
+        <button id="login-btn">Login & Join</button>
+        <div id="error-msg"></div>
     </div>
-    <div id="device-info">Detecting device & network...</div>
 
-    <h2>Tap Any Circle!</h2>
-    
-    <div class="grid" id="grid"></div>
+    <!-- Game Container (Hidden until login) -->
+    <div id="game-screen">
+        <div id="player-welcome"></div>
+        <div class="status-bar">
+            <span class="user-icon" id="userIcon">👤</span>
+            <span id="status-text">Waiting for players...</span>
+        </div>
+
+        <h2>Tap Any Circle!</h2>
+        <div class="grid" id="grid"></div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, push, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, onValue, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // Your Firebase Configuration
         const firebaseConfig = {
             projectId: "tapgame-28bc3",
             databaseURL: "https://tapgame-28bc3-default-rtdb.firebaseio.com/"
@@ -106,39 +182,49 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // --- 1. Presence & Device Info Logic ---
+        // Login Logic
+        const loginScreen = document.getElementById('login-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const usernameInput = document.getElementById('usernameInput');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginBtn = document.getElementById('login-btn');
+        const errorMsg = document.getElementById('error-msg');
+        const playerWelcome = document.getElementById('player-welcome');
+        
         const userIcon = document.getElementById('userIcon');
         const statusText = document.getElementById('status-text');
-        const deviceInfoEl = document.getElementById('device-info');
 
-        // Simple device model detection from browser user agent
-        const ua = navigator.userAgent;
-        let deviceName = "Mobile Device";
-        if (/android/i.test(ua)) deviceName = "Android Device";
-        else if (/iphone|ipad|ipod/i.test(ua)) deviceName = "iOS Device";
+        // Valid credentials
+        const validUsers = {
+            "Sam": "X",
+            "Manuel": "Y"
+        };
 
-        // Fetch public IP using a free fast API
-        fetch('https://api.ipify.org?format=json')
-            .then(res => res.json())
-            .then(data => {
-                const userIp = data.ip;
-                deviceInfoEl.textContent = `${deviceName} (${userIp})`;
-                registerPresence(userIp, deviceName);
-            })
-            .catch(() => {
-                deviceInfoEl.textContent = `${deviceName} (IP Hidden)`;
-                registerPresence("Unknown IP", deviceName);
-            });
+        loginBtn.addEventListener('click', () => {
+            const enteredUser = usernameInput.value.trim();
+            const enteredPass = passwordInput.value.trim();
 
-        function registerPresence(ip, device) {
+            if (validUsers[enteredUser] && validUsers[enteredUser] === enteredPass) {
+                // Successful Login
+                loginScreen.style.display = 'none';
+                gameScreen.style.display = 'flex';
+                playerWelcome.textContent = `Welcome, ${enteredUser}!`;
+
+                initGameSession(enteredUser);
+            } else {
+                errorMsg.textContent = "Invalid username or password!";
+            }
+        });
+
+        function initGameSession(playerName) {
             const connectionsRef = ref(db, 'connections');
             const myConnectionRef = push(connectionsRef);
 
-            // Add user info to database and automatically remove it if they close the page
-            set(myConnectionRef, { ip: ip, device: device });
+            // Register this authenticated player
+            set(myConnectionRef, { name: playerName });
             onDisconnect(myConnectionRef).remove();
 
-            // Listen to total active players online
+            // Track active players
             onValue(connectionsRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
@@ -150,38 +236,38 @@
                     statusText.textContent = `Connected (+1)`;
                 }
             });
-        }
 
-        // --- 2. Game Board Logic ---
-        const circlesRef = ref(db, 'circles');
-        const grid = document.getElementById('grid');
-        const totalCircles = 8;
-        const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0', '#FFA533', '#A533FF'];
-        const circleElements = [];
-        
-        for (let i = 0; i < totalCircles; i++) {
-            const circle = document.createElement('div');
-            circle.classList.add('circle');
+            // Initialize Game Board
+            const circlesRef = ref(db, 'circles');
+            const grid = document.getElementById('grid');
+            const totalCircles = 8;
+            const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0', '#FFA533', '#A533FF'];
+            const circleElements = [];
             
-            circle.addEventListener('click', () => {
-                const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                set(ref(db, `circles/${i}`), randomColor);
-            });
-
-            grid.appendChild(circle);
-            circleElements.push(circle);
-        }
-
-        onValue(circlesRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                data.forEach((color, index) => {
-                    if (color && circleElements[index]) {
-                        circleElements[index].style.backgroundColor = color;
-                    }
+            for (let i = 0; i < totalCircles; i++) {
+                const circle = document.createElement('div');
+                circle.classList.add('circle');
+                
+                circle.addEventListener('click', () => {
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                    set(ref(db, `circles/${i}`), randomColor);
                 });
+
+                grid.appendChild(circle);
+                circleElements.push(circle);
             }
-        });
+
+            onValue(circlesRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    data.forEach((color, index) => {
+                        if (color && circleElements[index]) {
+                            circleElements[index].style.backgroundColor = color;
+                        }
+                    });
+                }
+            });
+        }
     </script>
 </body>
 </html>
