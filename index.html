@@ -303,7 +303,7 @@
 <body>
 
     <!-- Noticeable Version Sidebar Badge -->
-    <div class="version-badge">v1.1.2</div>
+    <div class="version-badge">v1.1.3</div>
 
     <!-- Login Container -->
     <div id="login-screen">
@@ -543,10 +543,11 @@
             });
 
             // ==========================================
-            // AGORA VOICE CHAT LOGIC (Joined-State Guard)
+            // AGORA VOICE CHAT LOGIC (Embedded Temp Token)
             // ==========================================
-            const AGORA_APP_ID = "7edf2f888bc64c6baf30e5563fd6ad99";
+            const AGORA_APP_ID = "7edf2f88bc64c5baf30e5563fd6ad99";
             const CHANNEL_NAME = "tapgame-voice-call";
+            const AGORA_TOKEN = "007eJxTYEj9vODj4pvCzL0a5aois94vK1I+In3Ezvf8ib2fo9XYDl1QYDBPTUkzSrOwsEhKNjNJNktKTDM2SDU1NTNOSzFLTLG0/CNek9UQyMjA7WrOwsTACIYgvjBDSWJBanpibqpuWX5mcqpucmJODgMDE1wBC4OhgYEhAACrJwg=";
 
             let agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
             let localAudioTrack = null;
@@ -562,12 +563,12 @@
                 }
             });
 
-            // Join channel properly with async check
+            // Join channel properly with async check & Token
             async function initAgoraConnection() {
                 try {
-                    await agoraClient.join(AGORA_APP_ID, CHANNEL_NAME, null, null);
+                    await agoraClient.join(AGORA_APP_ID, CHANNEL_NAME, AGORA_TOKEN, null);
                     isConnectedToAgora = true;
-                    console.log("Successfully joined Agora channel!");
+                    console.log("Successfully joined Agora channel with token!");
                 } catch (err) {
                     console.error("Agora join error: ", err);
                 }
