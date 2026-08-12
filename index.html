@@ -3,11 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Tap Game</title>
+    <title>Multiplayer Tap Game & Chat</title>
     
-    <!-- Agora Web SDK -->
-    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
-
     <style>
         body {
             margin: 0;
@@ -186,34 +183,96 @@
             border-radius: 50%;
         }
 
-        /* Voice Call Control Panel */
-        .voice-panel {
+        /* Roblox-style Chat Widget Panel */
+        .chat-widget {
             width: 100%;
             background: #1e1e1e;
-            padding: 12px;
             border-radius: 15px;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
             margin-bottom: 15px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            overflow: hidden;
             box-sizing: border-box;
         }
 
-        .voice-btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: none;
-            font-weight: bold;
-            font-size: 0.85rem;
+        .chat-toggle-bar {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #252525;
             cursor: pointer;
-            transition: background 0.2s;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #2196F3;
         }
 
-        .mic-off { background: #ff5252; color: white; }
-        .mic-on { background: #4CAF50; color: white; }
-        .speaker-off { background: #444; color: #aaa; }
-        .speaker-on { background: #2196F3; color: white; }
+        .chat-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            background: #161616;
+        }
+
+        .chat-widget.open .chat-body {
+            max-height: 220px;
+        }
+
+        .chat-messages {
+            height: 140px;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-sizing: border-box;
+        }
+
+        .chat-msg {
+            font-size: 0.85rem;
+            background: #222;
+            padding: 6px 10px;
+            border-radius: 8px;
+            word-break: break-word;
+            line-height: 1.2;
+        }
+
+        .chat-msg span.sender {
+            font-weight: bold;
+            color: #4CAF50;
+            margin-right: 5px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            border-top: 1px solid #2a2a2a;
+            padding: 8px;
+            background: #1e1e1e;
+            gap: 8px;
+        }
+
+        .chat-input-area input {
+            flex: 1;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: #fff;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .chat-input-area button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
 
         /* Activity Log Ticker */
         #activity-log {
@@ -264,10 +323,45 @@
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             transition: transform 0.1s ease, background-color 0.2s ease;
+            position: relative;
         }
 
         .circle:active {
             transform: scale(0.95);
+        }
+
+        /* Roblox-Style Floating Speech Bubble Over Circles/Screen */
+        .speech-bubble {
+            position: absolute;
+            bottom: 105%;
+            left: 50%;
+            transform: translateX(-50%) scale(0);
+            background: #ffffff;
+            color: #000000;
+            padding: 6px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #ffffff transparent transparent transparent;
+        }
+
+        .speech-bubble.show {
+            transform: translateX(-50%) scale(1);
         }
 
         /* Private Bar Section */
@@ -302,8 +396,8 @@
 </head>
 <body>
 
-    <!-- Noticeable Version Sidebar Badge -->
-    <div class="version-badge">v1.1.4</div>
+    <!-- Version Badge -->
+    <div class="version-badge">v2.0-Chat</div>
 
     <!-- Login Container -->
     <div id="login-screen">
@@ -336,10 +430,19 @@
             <div class="dropdown-content" id="playerListContainer"></div>
         </div>
 
-        <!-- Voice Chat Controls Panel -->
-        <div class="voice-panel">
-            <button id="mic-btn" class="voice-btn mic-off">🎤 Mic: OFF</button>
-            <button id="speaker-btn" class="voice-btn speaker-off">🔊 Speaker: OFF</button>
+        <!-- Roblox-style Collapsible Chat Widget Panel -->
+        <div class="chat-widget" id="chatWidget">
+            <div class="chat-toggle-bar" id="chatToggleBtn">
+                <span>💬 Global Chat Box</span>
+                <span id="chatArrow">▼</span>
+            </div>
+            <div class="chat-body">
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-area">
+                    <input type="text" id="chatInput" placeholder="Type message to chat & speak...">
+                    <button id="chatSendBtn">Send</button>
+                </div>
+            </div>
         </div>
 
         <!-- Activity Log Box -->
@@ -386,8 +489,12 @@
         const activityLog = document.getElementById('activity-log');
         const secretLog = document.getElementById('secret-log');
 
-        const micBtn = document.getElementById('mic-btn');
-        const speakerBtn = document.getElementById('speaker-btn');
+        const chatWidget = document.getElementById('chatWidget');
+        const chatToggleBtn = document.getElementById('chatToggleBtn');
+        const chatArrow = document.getElementById('chatArrow');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const chatSendBtn = document.getElementById('chatSendBtn');
 
         const userProfiles = {
             "Sam": { pass: "X", pfp: "🐱" },
@@ -403,6 +510,11 @@
 
         dropdownToggle.addEventListener('click', () => {
             playerDropdown.classList.toggle('open');
+        });
+
+        chatToggleBtn.addEventListener('click', () => {
+            chatWidget.classList.toggle('open');
+            chatArrow.textContent = chatWidget.classList.contains('open') ? '▲' : '▼';
         });
 
         loginBtn.addEventListener('click', () => {
@@ -467,6 +579,12 @@
             for (let i = 0; i < totalCircles; i++) {
                 const circle = document.createElement('div');
                 circle.classList.add('circle');
+
+                // Roblox-style speech bubble attached over each circle element
+                const bubble = document.createElement('div');
+                bubble.classList.add('speech-bubble');
+                circle.appendChild(bubble);
+                circle.bubbleElement = bubble;
                 
                 circle.addEventListener('click', () => {
                     const randomColor = colors[Math.floor(Math.random() * colors.length)];
@@ -543,91 +661,62 @@
             });
 
             // ==========================================
-            // AGORA VOICE CHAT LOGIC (Updated Temp Token)
+            // FIREBASE CHAT & ROBLOX SPEECH HEAD BUBBLE LOGIC
             // ==========================================
-            const AGORA_APP_ID = "7edf2f88bc64c5baf30e5563fd6ad99";
-            const CHANNEL_NAME = "tapgame-voice-call";
-            const AGORA_TOKEN = "007eJxTYNiTfEHZ+fBXg92ztaWOii5J3dz6x9yloz+Vx3ppEqOL3HEFBvPUlDSjNAsLi6RkM5Nks6TENGODVFNTM+O0FLPEFEvLeZI1WQ2BjAz9D7+xMDEwgiGIL8RQkliQnpibqpuWX5mcqpucmJODwMAEl2dkMAQA9DUlvQ==";
+            const chatMessagesRef = ref(db, 'chatMessages');
 
-            let agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-            let localAudioTrack = null;
-            let isMicActive = false;
-            let isSpeakerActive = false;
-            let isConnectedToAgora = false;
+            function sendChatMessage() {
+                const text = chatInput.value.trim();
+                if (!text) return;
 
-            // Handle incoming remote audio streams
-            agoraClient.on("user-published", async (user, mediaType) => {
-                await agoraClient.subscribe(user, mediaType);
-                if (mediaType === "audio" && isSpeakerActive) {
-                    user.audioTrack.play();
-                }
-            });
+                push(chatMessagesRef, {
+                    sender: playerName,
+                    text: text,
+                    timestamp: Date.now()
+                });
 
-            // Join channel properly with async check & Token
-            async function initAgoraConnection() {
-                try {
-                    await agoraClient.join(AGORA_APP_ID, CHANNEL_NAME, AGORA_TOKEN, null);
-                    isConnectedToAgora = true;
-                    console.log("Successfully joined Agora channel with token!");
-                } catch (err) {
-                    console.error("Agora join error: ", err);
-                }
+                chatInput.value = '';
             }
-            initAgoraConnection();
 
-            // MIC BUTTON TOGGLE
-            micBtn.addEventListener('click', async () => {
-                if (!isConnectedToAgora) {
-                    alert("Connecting to voice channel, please wait a second and try again.");
-                    return;
-                }
-
-                if (!isMicActive) {
-                    try {
-                        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-                        await agoraClient.publish(localAudioTrack);
-                        
-                        isMicActive = true;
-                        micBtn.textContent = "🎤 Mic: ON";
-                        micBtn.className = "voice-btn mic-on";
-                    } catch (err) {
-                        console.error("Mic error details:", err);
-                        alert("Microphone permission denied or unavailable.");
-                    }
-                } else {
-                    if (localAudioTrack) {
-                        await agoraClient.unpublish(localAudioTrack);
-                        localAudioTrack.close();
-                        localAudioTrack = null;
-                    }
-                    isMicActive = false;
-                    micBtn.textContent = "🎤 Mic: OFF";
-                    micBtn.className = "voice-btn mic-off";
-                }
+            chatSendBtn.addEventListener('click', sendChatMessage);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendChatMessage();
             });
 
-            // SPEAKER BUTTON TOGGLE
-            speakerBtn.addEventListener('click', () => {
-                isSpeakerActive = !isSpeakerActive;
-                
-                if (isSpeakerActive) {
-                    speakerBtn.textContent = "🔊 Speaker: ON";
-                    speakerBtn.className = "voice-btn speaker-on";
-                    
-                    agoraClient.remoteUsers.forEach(user => {
-                        if (user.audioTrack) {
-                            user.audioTrack.play();
-                        }
+            // Listen for incoming chat messages
+            onValue(chatMessagesRef, (snapshot) => {
+                const data = snapshot.val();
+                chatMessages.innerHTML = '';
+
+                if (data) {
+                    const messages = Object.values(data);
+                    // Keep latest messages sorted if needed, or iterate directly
+                    messages.forEach(msg => {
+                        const msgDiv = document.createElement('div');
+                        msgDiv.classList.add('chat-msg');
+                        msgDiv.innerHTML = `<span class="sender">${msg.sender}:</span><span>${msg.text}</span>`;
+                        chatMessages.appendChild(msgDiv);
                     });
-                } else {
-                    speakerBtn.textContent = "🔊 Speaker: OFF";
-                    speakerBtn.className = "voice-btn speaker-off";
-                    
-                    agoraClient.remoteUsers.forEach(user => {
-                        if (user.audioTrack) {
-                            user.audioTrack.stop();
-                        }
-                    });
+
+                    // Auto scroll to bottom of chat
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                    // Trigger Roblox-style speech head bubble for the latest message
+                    const latest = messages[messages.length - 1];
+                    if (latest && circleElements.length > 0) {
+                        // Pick a random circle to pop up the speech bubble over
+                        const randomCircle = circleElements[Math.floor(Math.random() * circleElements.length)];
+                        const bubble = randomCircle.bubbleElement;
+
+                        bubble.textContent = `${latest.sender}: ${latest.text}`;
+                        bubble.classList.add('show');
+
+                        // Clear existing timeout if any
+                        if (bubble.hideTimeout) clearTimeout(bubble.hideTimeout);
+                        bubble.hideTimeout = setTimeout(() => {
+                            bubble.classList.remove('show');
+                        }, 3500);
+                    }
                 }
             });
         }
