@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Multiplayer Tap Game</title>
+    
+    <!-- Agora Web SDK -->
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+
     <style>
         body {
             margin: 0;
@@ -182,6 +186,35 @@
             border-radius: 50%;
         }
 
+        /* Voice Call Control Panel */
+        .voice-panel {
+            width: 100%;
+            background: #1e1e1e;
+            padding: 12px;
+            border-radius: 15px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            box-sizing: border-box;
+        }
+
+        .voice-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .mic-off { background: #ff5252; color: white; }
+        .mic-on { background: #4CAF50; color: white; }
+        .speaker-off { background: #444; color: #aaa; }
+        .speaker-on { background: #2196F3; color: white; }
+
         /* Activity Log Ticker */
         #activity-log {
             background: #1e1e1e;
@@ -270,7 +303,7 @@
 <body>
 
     <!-- Noticeable Version Sidebar Badge -->
-    <div class="version-badge">v1.1.0</div>
+    <div class="version-badge">v1.1.1</div>
 
     <!-- Login Container -->
     <div id="login-screen">
@@ -301,6 +334,12 @@
               <span id="playerCount">(+0)</span>
             </div>
             <div class="dropdown-content" id="playerListContainer"></div>
+        </div>
+
+        <!-- Voice Chat Controls Panel -->
+        <div class="voice-panel">
+            <button id="mic-btn" class="voice-btn mic-off">🎤 Mic: OFF</button>
+            <button id="speaker-btn" class="voice-btn speaker-off">🔊 Speaker: OFF</button>
         </div>
 
         <!-- Activity Log Box -->
@@ -346,6 +385,9 @@
         const playerListContainer = document.getElementById('playerListContainer');
         const activityLog = document.getElementById('activity-log');
         const secretLog = document.getElementById('secret-log');
+
+        const micBtn = document.getElementById('mic-btn');
+        const speakerBtn = document.getElementById('speaker-btn');
 
         const userProfiles = {
             "Sam": { pass: "X", pfp: "🐱" },
@@ -466,11 +508,7 @@
                 
                 pCircle.addEventListener('click', () => {
                     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                    
-                    // Save color selection directly to Firebase database under this user's private path
                     set(ref(db, `privateBars/${playerName}/${i}`), randomColor);
-
-                    // Broadcast alert that they changed a secret circle
                     set(secretActionRef, {
                         player: playerName,
                         timestamp: Date.now()
@@ -481,7 +519,6 @@
                 privateCircleElements.push(pCircle);
             }
 
-            // Sync private bar state from server database so it persists even if user leaves or logs back in later
             onValue(privateCirclesRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
@@ -493,17 +530,102 @@
                 }
             });
 
-            // Listen for secret updates to show vanishing notification
             let secretTimeout;
             onValue(secretActionRef, (snapshot) => {
                 const action = snapshot.val();
                 if (action) {
                     secretLog.textContent = `${action.player} has changed color to a secret colour`;
-                    
                     clearTimeout(secretTimeout);
                     secretTimeout = setTimeout(() => {
                         secretLog.textContent = '';
                     }, 3000);
+                }
+            });
+
+            // ==========================================
+            // AGORA VOICE CHAT LOGIC (Universal 2-Phone Call)
+            // ==========================================
+            const AGORA_APP_ID = "aea4e3b1469b4c739a24dbe6c66fbee1";
+            const CHANNEL_NAME = "tapgame-voice-call";
+
+            let agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+            let localAudioTrack = null;
+            let isMicActive = false;
+            let isSpeakerActive = false;
+
+            // Handle incoming remote audio streams from the other phone
+            agoraClient.on("user-published", async (user, mediaType) => {
+                await agoraClient.subscribe(user, mediaType);
+                if (mediaType === "audio") {
+                    // Only play remote audio if speaker is active on this phone
+                    if (isSpeakerActive) {
+                        user.audioTrack.play();
+                    }
+                }
+            });
+
+            agoraClient.on("user-unpublished", (user, mediaType) => {
+                if (mediaType === "audio") {
+                    console.log("Remote user stopped talking");
+                }
+            });
+
+            // Connect to Agora channel in background on startup
+            agoraClient.join(AGORA_APP_ID, CHANNEL_NAME, null, null).catch(err => {
+                console.error("Agora join error: ", err);
+            });
+
+            // MIC BUTTON TOGGLE
+            micBtn.addEventListener('click', async () => {
+                if (!isMicActive) {
+                    try {
+                        // Request browser microphone permission & create track
+                        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                        await agoraClient.publish(localAudioTrack);
+                        
+                        isMicActive = true;
+                        micBtn.textContent = "🎤 Mic: ON";
+                        micBtn.className = "voice-btn mic-on";
+                    } catch (err) {
+                        alert("Microphone permission denied or unavailable.");
+                        console.error(err);
+                    }
+                } else {
+                    if (localAudioTrack) {
+                        await agoraClient.unpublish(localAudioTrack);
+                        localAudioTrack.close();
+                        localAudioTrack = null;
+                    }
+                    isMicActive = false;
+                    micBtn.textContent = "🎤 Mic: OFF";
+                    micBtn.className = "voice-btn mic-off";
+                }
+            });
+
+            // SPEAKER BUTTON TOGGLE
+            speakerBtn.addEventListener('click', () => {
+                isSpeakerActive = !isSpeakerActive;
+                
+                if (isSpeakerActive) {
+                    speakerBtn.textContent = "🔊 Speaker: ON";
+                    speakerBtn.className = "voice-btn speaker-on";
+                    
+                    // Play audio for any remote users already in the channel
+                    agoraClient.remoteUsers.forEach(user => {
+                        if (user.audioTrack) {
+                            user.audioTrack.play();
+                        }
+                    });
+                } else {
+                    speakerBtn.textContent = "🔊 Speaker: OFF";
+                    speakerBtn.className = "voice-btn speaker-off";
+                    
+                    // Stop audio playback for all remote users
+                    agoraClient.remoteUsers.forEach(user => {
+                        if (user.audioTrack) {
+                            user.audioTrack.stop();
+                        }
+                    });
                 }
             });
         }
