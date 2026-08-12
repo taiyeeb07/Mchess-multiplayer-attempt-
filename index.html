@@ -303,7 +303,7 @@
 <body>
 
     <!-- Noticeable Version Sidebar Badge -->
-    <div class="version-badge">v1.1.1</div>
+    <div class="version-badge">v1.1.2</div>
 
     <!-- Login Container -->
     <div id="login-screen">
@@ -543,7 +543,7 @@
             });
 
             // ==========================================
-            // AGORA VOICE CHAT LOGIC (Universal 2-Phone Call)
+            // AGORA VOICE CHAT LOGIC (Joined-State Guard)
             // ==========================================
             const AGORA_APP_ID = "aea4e3b1469b4c739a24dbe6c66fbee1";
             const CHANNEL_NAME = "tapgame-voice-call";
@@ -552,34 +552,37 @@
             let localAudioTrack = null;
             let isMicActive = false;
             let isSpeakerActive = false;
+            let isConnectedToAgora = false;
 
-            // Handle incoming remote audio streams from the other phone
+            // Handle incoming remote audio streams
             agoraClient.on("user-published", async (user, mediaType) => {
                 await agoraClient.subscribe(user, mediaType);
-                if (mediaType === "audio") {
-                    // Only play remote audio if speaker is active on this phone
-                    if (isSpeakerActive) {
-                        user.audioTrack.play();
-                    }
+                if (mediaType === "audio" && isSpeakerActive) {
+                    user.audioTrack.play();
                 }
             });
 
-            agoraClient.on("user-unpublished", (user, mediaType) => {
-                if (mediaType === "audio") {
-                    console.log("Remote user stopped talking");
+            // Join channel properly with async check
+            async function initAgoraConnection() {
+                try {
+                    await agoraClient.join(AGORA_APP_ID, CHANNEL_NAME, null, null);
+                    isConnectedToAgora = true;
+                    console.log("Successfully joined Agora channel!");
+                } catch (err) {
+                    console.error("Agora join error: ", err);
                 }
-            });
-
-            // Connect to Agora channel in background on startup
-            agoraClient.join(AGORA_APP_ID, CHANNEL_NAME, null, null).catch(err => {
-                console.error("Agora join error: ", err);
-            });
+            }
+            initAgoraConnection();
 
             // MIC BUTTON TOGGLE
             micBtn.addEventListener('click', async () => {
+                if (!isConnectedToAgora) {
+                    alert("Connecting to voice channel, please wait a second and try again.");
+                    return;
+                }
+
                 if (!isMicActive) {
                     try {
-                        // Request browser microphone permission & create track
                         localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
                         await agoraClient.publish(localAudioTrack);
                         
@@ -587,8 +590,8 @@
                         micBtn.textContent = "🎤 Mic: ON";
                         micBtn.className = "voice-btn mic-on";
                     } catch (err) {
+                        console.error("Mic error details:", err);
                         alert("Microphone permission denied or unavailable.");
-                        console.error(err);
                     }
                 } else {
                     if (localAudioTrack) {
@@ -610,7 +613,6 @@
                     speakerBtn.textContent = "🔊 Speaker: ON";
                     speakerBtn.className = "voice-btn speaker-on";
                     
-                    // Play audio for any remote users already in the channel
                     agoraClient.remoteUsers.forEach(user => {
                         if (user.audioTrack) {
                             user.audioTrack.play();
@@ -620,7 +622,6 @@
                     speakerBtn.textContent = "🔊 Speaker: OFF";
                     speakerBtn.className = "voice-btn speaker-off";
                     
-                    // Stop audio playback for all remote users
                     agoraClient.remoteUsers.forEach(user => {
                         if (user.audioTrack) {
                             user.audioTrack.stop();
