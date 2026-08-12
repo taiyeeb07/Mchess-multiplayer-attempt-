@@ -44,7 +44,7 @@
             border-radius: 15px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.5);
             width: 100%;
-            max-width: 300px;
+            max-width: 320px;
             text-align: center;
         }
 
@@ -76,6 +76,37 @@
             font-size: 1rem;
         }
 
+        /* Scrollable List of Available Players */
+        .available-users-box {
+            background: #161616;
+            border: 1px solid #333;
+            border-radius: 8px;
+            max-height: 110px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            text-align: left;
+            padding: 8px;
+        }
+
+        .available-users-box .list-title {
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .available-user-item {
+            font-size: 0.85rem;
+            color: #b0bec5;
+            padding: 3px 5px;
+            border-bottom: 1px solid #222;
+        }
+
+        .available-user-item:last-child {
+            border-bottom: none;
+        }
+
         #login-btn {
             width: 100%;
             padding: 10px;
@@ -86,7 +117,7 @@
             font-size: 1rem;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 10px;
+            margin-top: 5px;
         }
 
         #error-msg {
@@ -130,7 +161,7 @@
             font-weight: bold;
         }
 
-        /* Expanding Player List Dropdown */
+        /* Expanding Player List Dropdown with Green Circle Indicator */
         .player-dropdown {
             width: 100%;
             background: #1e1e1e;
@@ -151,6 +182,20 @@
             font-size: 0.9rem;
         }
 
+        .indicator-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .online-circle {
+            width: 10px;
+            height: 10px;
+            background-color: #4CAF50;
+            border-radius: 50%;
+            box-shadow: 0 0 6px #4CAF50;
+        }
+
         .dropdown-content {
             max-height: 0;
             overflow: hidden;
@@ -167,7 +212,6 @@
             display: flex;
             align-items: center;
             padding: 10px 20px;
-            gap: 10px;
             font-size: 0.9rem;
             border-bottom: 1px solid #222;
         }
@@ -176,14 +220,7 @@
             border-bottom: none;
         }
 
-        .pfp {
-            font-size: 1.2rem;
-            background: #2a2a2a;
-            padding: 4px 8px;
-            border-radius: 50%;
-        }
-
-        /* Roblox-style Chat Widget Panel */
+        /* Chat Widget Panel */
         .chat-widget {
             width: 100%;
             background: #1e1e1e;
@@ -240,7 +277,6 @@
 
         .chat-msg span.sender {
             font-weight: bold;
-            color: #4CAF50;
             margin-right: 5px;
         }
 
@@ -323,45 +359,10 @@
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             transition: transform 0.1s ease, background-color 0.2s ease;
-            position: relative;
         }
 
         .circle:active {
             transform: scale(0.95);
-        }
-
-        /* Roblox-Style Floating Speech Bubble Over Circles/Screen */
-        .speech-bubble {
-            position: absolute;
-            bottom: 105%;
-            left: 50%;
-            transform: translateX(-50%) scale(0);
-            background: #ffffff;
-            color: #000000;
-            padding: 6px 10px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            white-space: nowrap;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 50;
-            pointer-events: none;
-        }
-
-        .speech-bubble::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #ffffff transparent transparent transparent;
-        }
-
-        .speech-bubble.show {
-            transform: translateX(-50%) scale(1);
         }
 
         /* Private Bar Section */
@@ -397,14 +398,26 @@
 <body>
 
     <!-- Version Badge -->
-    <div class="version-badge">v2.0-Chat</div>
+    <div class="version-badge">v3.0-Clean</div>
 
     <!-- Login Container -->
     <div id="login-screen">
         <h2>Player Login</h2>
+        
+        <!-- Scrollable list of available players instead of placeholder hints -->
+        <div class="available-users-box">
+            <div class="list-title">Registered Players</div>
+            <div class="available-user-item">Taiyeeb</div>
+            <div class="available-user-item">Ajwaad</div>
+            <div class="available-user-item">Arafat</div>
+            <div class="available-user-item">Yusuf</div>
+            <div class="available-user-item">Munim</div>
+            <div class="available-user-item">Tamim</div>
+        </div>
+
         <div class="input-group">
             <label>Username</label>
-            <input type="text" id="usernameInput" placeholder="Sam, Manuel, Martha, Arthur">
+            <input type="text" id="usernameInput" placeholder="Enter username">
         </div>
         <div class="input-group">
             <label>Password</label>
@@ -421,25 +434,28 @@
             <button id="logout-btn">Log Out</button>
         </div>
 
-        <!-- Expanding Player List Component -->
+        <!-- Expanding Player List Component with Green Circle Indicator -->
         <div class="player-dropdown" id="playerDropdown">
             <div class="dropdown-header" id="dropdownToggle">
-              <span>👤 Connected Players</span>
-              <span id="playerCount">(+0)</span>
+              <span>Connected Players</span>
+              <div class="indicator-group">
+                  <div class="online-circle"></div>
+                  <span id="playerCount">(0)</span>
+              </div>
             </div>
             <div class="dropdown-content" id="playerListContainer"></div>
         </div>
 
-        <!-- Roblox-style Collapsible Chat Widget Panel -->
+        <!-- Chat Widget Panel -->
         <div class="chat-widget" id="chatWidget">
             <div class="chat-toggle-bar" id="chatToggleBtn">
-                <span>💬 Global Chat Box</span>
+                <span>Global Chat Box</span>
                 <span id="chatArrow">▼</span>
             </div>
             <div class="chat-body">
                 <div class="chat-messages" id="chatMessages"></div>
                 <div class="chat-input-area">
-                    <input type="text" id="chatInput" placeholder="Type message to chat & speak...">
+                    <input type="text" id="chatInput" placeholder="Type message to chat...">
                     <button id="chatSendBtn">Send</button>
                 </div>
             </div>
@@ -496,11 +512,14 @@
         const chatInput = document.getElementById('chatInput');
         const chatSendBtn = document.getElementById('chatSendBtn');
 
+        // New profiles with requested credentials and fixed colors for name tagging
         const userProfiles = {
-            "Sam": { pass: "X", pfp: "🐱" },
-            "Manuel": { pass: "Y", pfp: "🐶" },
-            "Martha": { pass: "Z", pfp: "🦊" },
-            "Arthur": { pass: "A", pfp: "🦁" }
+            "Taiyeeb": { pass: "wolf", color: "#FF5733" },
+            "Ajwaad": { pass: "anime", color: "#33FF57" },
+            "Arafat": { pass: "siddique", color: "#3357FF" },
+            "Yusuf": { pass: "philosophy", color: "#F3FF33" },
+            "Munim": { pass: "science", color: "#FF33F3" },
+            "Tamim": { pass: "debate", color: "#33FFF0" }
         };
 
         const savedUser = localStorage.getItem('tapGameUser');
@@ -551,18 +570,16 @@
                 
                 if (data) {
                     const activeUsers = Object.values(data);
-                    playerCount.textContent = `(+${activeUsers.length})`;
+                    playerCount.textContent = `(${activeUsers.length})`;
                     
                     activeUsers.forEach(user => {
-                        const pfpEmoji = userProfiles[user.name] ? userProfiles[user.name].pfp : "👤";
-                        
                         const item = document.createElement('div');
                         item.classList.add('player-item');
-                        item.innerHTML = `<span class="pfp">${pfpEmoji}</span> <span>${user.name}</span>`;
+                        item.textContent = user.name;
                         playerListContainer.appendChild(item);
                     });
                 } else {
-                    playerCount.textContent = `(+0)`;
+                    playerCount.textContent = `(0)`;
                 }
             });
 
@@ -579,12 +596,6 @@
             for (let i = 0; i < totalCircles; i++) {
                 const circle = document.createElement('div');
                 circle.classList.add('circle');
-
-                // Roblox-style speech bubble attached over each circle element
-                const bubble = document.createElement('div');
-                bubble.classList.add('speech-bubble');
-                circle.appendChild(bubble);
-                circle.bubbleElement = bubble;
                 
                 circle.addEventListener('click', () => {
                     const randomColor = colors[Math.floor(Math.random() * colors.length)];
@@ -661,7 +672,7 @@
             });
 
             // ==========================================
-            // FIREBASE CHAT & ROBLOX SPEECH HEAD BUBBLE LOGIC
+            // FIREBASE CHAT LOGIC (Fixed Unique Player Colors)
             // ==========================================
             const chatMessagesRef = ref(db, 'chatMessages');
 
@@ -690,33 +701,19 @@
 
                 if (data) {
                     const messages = Object.values(data);
-                    // Keep latest messages sorted if needed, or iterate directly
                     messages.forEach(msg => {
                         const msgDiv = document.createElement('div');
                         msgDiv.classList.add('chat-msg');
-                        msgDiv.innerHTML = `<span class="sender">${msg.sender}:</span><span>${msg.text}</span>`;
+                        
+                        // Assign specific fixed color to the sender name based on profile setup
+                        const senderColor = userProfiles[msg.sender] ? userProfiles[msg.sender].color : "#4CAF50";
+
+                        msgDiv.innerHTML = `<span class="sender" style="color: ${senderColor};">${msg.sender}:</span><span>${msg.text}</span>`;
                         chatMessages.appendChild(msgDiv);
                     });
 
                     // Auto scroll to bottom of chat
                     chatMessages.scrollTop = chatMessages.scrollHeight;
-
-                    // Trigger Roblox-style speech head bubble for the latest message
-                    const latest = messages[messages.length - 1];
-                    if (latest && circleElements.length > 0) {
-                        // Pick a random circle to pop up the speech bubble over
-                        const randomCircle = circleElements[Math.floor(Math.random() * circleElements.length)];
-                        const bubble = randomCircle.bubbleElement;
-
-                        bubble.textContent = `${latest.sender}: ${latest.text}`;
-                        bubble.classList.add('show');
-
-                        // Clear existing timeout if any
-                        if (bubble.hideTimeout) clearTimeout(bubble.hideTimeout);
-                        bubble.hideTimeout = setTimeout(() => {
-                            bubble.classList.remove('show');
-                        }, 3500);
-                    }
                 }
             });
         }
